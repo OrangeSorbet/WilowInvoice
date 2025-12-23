@@ -1,0 +1,37 @@
+# ALWAYS ACTIVATE VIRTUAL ENVIRONMENT BY 
+# .venv/Scripts/activate 
+# IN TERMINAL BEFORE INSTALLING ANYTHING
+# python -m spacy download en_core_web_sm
+# pip install -r requirements.txt
+
+# --- Core GUI Framework ---
+PySide6==6.10.1            # Updated for Python 3.11/3.12 compatibility
+
+# --- PDF & OCR Processing ---
+pdfplumber==0.11.0        # Updated text extraction core
+pytesseract==0.3.13       # Latest Tesseract wrapper
+opencv-python-headless==4.10.0.84 # Updated computer vision core
+Pillow==11.0.0            # Updated imaging library
+pdf2image
+
+# --- Intelligence & NLP ---
+spacy==3.8.2              # NLP Engine
+# Note: Run 'python -m spacy download en_core_web_sm' after install
+
+# --- Security & Encryption ---
+cryptography==44.0.0      # Latest AES/Encryption primitives
+python-magic-bin==0.4.14  # File type detection (Windows/Linux)
+passlib==1.7.4            # Password hashing
+
+# --- Storage & Data ---
+pandas==2.2.3             # Data structures
+openpyxl==3.1.5           # Excel export engine
+SQLAlchemy==2.0.36        # Database ORM
+
+# --- Build & Packaging ---
+Nuitka==2.5.1             # Python-to-C Compiler
+zstandard==0.23.0         # Compression
+
+# --- Utilities ---
+PyYAML==6.0.2             # Config parsing
+python-dotenv==1.0.1      # Env vars

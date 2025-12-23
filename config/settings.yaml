@@ -1,0 +1,11 @@
+app:
+  name: "Wilow Invoice Extractor"
+  version: "1.0.0"
+  allowed_extensions: [".pdf"]
+
+storage:
+  db_name: "invoices.db"
+  export_default_name: "export.csv"
+
+security:
+  max_file_size_mb: 20
