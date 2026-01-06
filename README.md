@@ -48,7 +48,7 @@ The system follows a **moduled, separation-of-concerns** architecture. The UI is
 │             │                                             │
 │   ┌─────────▼─────────┐      ┌────────────────────────┐   │
 │   │ Digital PDF Parser│      │ OCR Engine (Tesseract) │   │
-│   │  (pdfplumber)     │      │  - Isolated Process    │   │
+│   │  (Poppler)        │      │  - Isolated Process    │   │
 │   └─────────┬─────────┘      └──────────┬─────────────┘   │
 │             │                           │                 │
 │             └──────────────┬────────────┘                 │
