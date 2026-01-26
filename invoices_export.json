@@ -1,0 +1,70 @@
+[
+    {
+        "batch": "304566f1-e4c0-41b5-99d0-8e1032cd1c2b",
+        "company_bank_details": {
+            "account_holder_name": null,
+            "account_number": null,
+            "bank_ifsc_code": null,
+            "bank_name": null,
+            "company_gstin": "27CRTPS5869M1ZD",
+            "company_pan": null
+        },
+        "company_details": {
+            "company_address": null,
+            "company_email": "sujitengineering@gmail.com",
+            "company_name": "All Types of Fabrication & Machining Works",
+            "company_telephone": null
+        },
+        "datetime": "2026-01-26T14:32:03.065787",
+        "goods": {
+            "financials": {
+                "cgst": {
+                    "amount": null,
+                    "rate": null
+                },
+                "sgst": {
+                    "amount": null,
+                    "rate": null
+                },
+                "total_after_tax": null,
+                "total_before_tax": null,
+                "total_in_words": "68062.50",
+                "total_qty": 1.0
+            },
+            "items": [
+                {
+                    "description": "|DBMS 7308 605 KGS 112.50 6800 pte | DRG NO 3 5669 1041 0527 MS FAB | ITEM CODE - 8285270 SR-10 WET - 605 KG EACH QTY-1 NOS ORDER - 81354649/20 - VI PUMP S.R, S.B, PRIMER DONE MATERIAL COST - 605 KG X 104 =62920/PIECE STUFFING BOX COST - 5300/PIECE P Rs. In words : 68062.50 | _|sast 6125.63 For SUJIT ENGINEERING Branch : Pradhikaran Chikhali . price of the goods described and that all perticulars are true & correct . s 4 4 SS . eat fet",
+                    "drg_number": "3 5669 1041 0527",
+                    "hsn_sac_code": "7308",
+                    "item_code": null,
+                    "price": 112.5,
+                    "qty": 1.0,
+                    "srno": "1",
+                    "total_amount": 62.5,
+                    "unit": "NOS"
+                }
+            ]
+        },
+        "invoice_details": {
+            "due_date": null,
+            "invoice_date": "12-01-2026",
+            "invoice_id": null,
+            "place_of_supply": null,
+            "po_number": "9910420541",
+            "reverse_charge": "No"
+        },
+        "layout_blocks": [],
+        "party_details": {
+            "address": null,
+            "challan_number": null,
+            "gstin_number": null,
+            "name": "(ISO 9001:2008 )"
+        },
+        "source_files": {
+            "name": "Four Sample Supplier Invoices-2.pdf",
+            "page_index": 0,
+            "status": "OCR_PROCESSED"
+        },
+        "type": "TAX INVOICE"
+    }
+]

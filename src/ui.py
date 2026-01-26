@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QThread, Signal, QTimer, QPropertyAnimation, QPoint, QEasingCurve
 from PySide6.QtGui import QColor
 
-from src.core import InvoicePipeline, export_to_excel
+from src.core import InvoiceEngine, export_to_json
 from .security import SecurityManager
 from .utils import setup_logger
 
@@ -113,20 +113,26 @@ class Worker(QThread):
     def __init__(self, files):
         super().__init__()
         self.files = files
-        self.pipeline = InvoicePipeline()
+        # Explicitly point to the .exe inside your custom path
+        tesseract_exe = r"C:\Users\ashvi\AppData\Local\Programs\Tesseract-OCR\tesseract.exe"
+        self.engine = InvoiceEngine(tesseract_cmd=tesseract_exe)
 
     def run(self):
-        for path in self.files:
-            try:
-                data = self.pipeline.process_invoice(path)
-                self.progress.emit(data, "Processed")
-            except Exception as e:
-                logger.error(f"Failed {path}: {e}")
+        try:
+            result = self.engine.process_batch(self.files)
+            
+            for inv in result.get("invoices", []):
+                self.progress.emit(inv, "Processed")
+                
+            for err in result.get("errors", []):
                 self.progress.emit(
-                    {"Filename": os.path.basename(path), "Vendor Name": "N/A"},
+                    {"Filename": err.get("file"), "Vendor Name": "N/A"}, 
                     "Error"
                 )
-        self.finished.emit()
+        except Exception as e:
+            logger.error(f"Worker thread failed: {e}")
+        finally:
+            self.finished.emit()
 
 # ---------------- MAIN WINDOW ----------------
 
@@ -170,7 +176,7 @@ class MainWindow(QMainWindow):
         tb.addWidget(lbl_title)
         tb.addWidget(lbl_sub)
 
-        self.btn_export = QPushButton("Export Excel")
+        self.btn_export = QPushButton("Export JSON")
         self.btn_export.setProperty("class", "outline")
         self.btn_export.setEnabled(False)
         self.btn_export.setFixedWidth(120)
@@ -297,14 +303,15 @@ class MainWindow(QMainWindow):
             return
 
         path, _ = QFileDialog.getSaveFileName(
-            self, "Export Excel", "invoices_export.xlsx", "Excel Files (*.xlsx)"
+            self, "Export JSON", "invoices_export.json", "JSON Files (*.json)"
         )
         if not path:
             return
 
         try:
-            export_to_excel(self.extracted_rows, path)
-            self.show_toast("Excel exported successfully.", "success")
+            from src.core import export_to_json
+            export_to_json(self.extracted_rows, path)
+            self.show_toast("JSON exported successfully.", "success")
         except Exception as e:
             logger.error(f"Export failed: {e}")
-            self.show_toast("Failed to export Excel.", "error")
+            self.show_toast("Failed to export JSON.", "error")
