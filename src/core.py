@@ -1,244 +1,325 @@
+import os
 import re
 import cv2
 import numpy as np
-import pdfplumber
+import pandas as pd
 import pytesseract
 from pdf2image import convert_from_path
 from datetime import datetime
-import os
-import pandas as pd
 
-# ---------------- CONFIG ----------------
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-POPPLER_PATH = r"C:\poppler-25.12.0\Library\bin"
 
+POPPLER_PATH = r"C:\poppler-25.11.0\Library\bin"
 OCR_CONFIG = r"--oem 3 --psm 6"
 
-AMOUNT_REGEX = r"(\d{1,3}(?:,\d{3})*\.\d{2})"
 GST_REGEX = r"\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]"
-DATE_REGEX = r"\d{2}[/-]\d{2}[/-]\d{4}"
-PAN_REGEX = r"[A-Z]{5}[0-9]{4}[A-Z]"
+AMOUNT_REGEX = r"\d+\.\d{2}"
 IFSC_REGEX = r"[A-Z]{4}0[A-Z0-9]{6}"
 ACCOUNT_REGEX = r"\b\d{9,18}\b"
-
+AMOUNT_REGEX_COMMA = r"[\d,]+\.\d{2}"
+DATE_REGEX = r"\d{1,2}[- ][A-Za-z]{3}[- ]\d{2}"
 
 class InvoicePipeline:
-    """
-    Extracts maximum possible information from invoices
-    and returns a flat dict ready for Excel export.
-    """
 
-    # ================= PUBLIC =================
     def process_invoice(self, pdf_path):
-        filename = os.path.basename(pdf_path)
+        raw_text = self._run_ocr(pdf_path)
+        if not raw_text.strip():
+            raise RuntimeError("OCR produced empty text")
+        data = self._parse_text(raw_text)
+        data["Filename"] = os.path.basename(pdf_path)
+        data["Processed On"] = datetime.now().strftime("%d-%m-%Y %H:%M")
+        return data
 
-        raw_text, method = self._extract_text(pdf_path)
-        lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
-
-        # ---- FIX SGST RATE (table OCR issue) ----
-        cgst_rate = self._find_percent(lines, "CGST")
-        sgst_rate = self._find_percent(lines, "SGST")
-        if not sgst_rate and cgst_rate:
-            sgst_rate = cgst_rate
-
-        return {
-            # -------- File / Status --------
-            "Filename": filename,
-            "Status": "PROCESSED",
-            "Processed On": datetime.now().strftime("%d-%m-%Y %H:%M"),
-            "OCR Method": method,
-
-            # -------- Invoice Header --------
-            "Invoice Type": self._find_contains(lines, ["TAX INVOICE"]),
-            "Invoice No": self._label_value(raw_text, ["Invoice No"]),
-            "Invoice Date": self._first_match(DATE_REGEX, raw_text),
-            "Due Date": self._label_value(raw_text, ["Due Date"]),
-            "Place of Supply": self._label_value(raw_text, ["Place of Supply"]),
-            "Currency": "INR",
-
-            # -------- Vendor --------
-            "Vendor Name": self._vendor_name(lines),
-            "Vendor Address": self._vendor_address(lines),
-            "Vendor GSTIN": self._first_match(GST_REGEX, raw_text),
-            "Vendor PAN": self._first_match(PAN_REGEX, raw_text),
-            "Vendor Email": self._label_value(raw_text, ["Email"]),
-
-            # -------- Buyer --------
-            "Buyer Name": self._buyer_name(lines),
-            "Buyer Address": self._buyer_address(lines),
-            "Buyer GSTIN": self._buyer_gstin(lines),
-
-            # -------- Line Items --------
-            **self._extract_items(lines),
-
-            # -------- Taxes --------
-            "CGST Rate (%)": cgst_rate,
-            "CGST Amount": self._find_amount(lines, "CGST"),
-            "SGST Rate (%)": sgst_rate,
-            "SGST Amount": self._find_amount(lines, "SGST"),
-            "Total Tax": self._find_amount(lines, "Tax"),
-
-            # -------- Totals --------
-            "Subtotal": self._find_amount(lines, "Sub Total"),
-            "Grand Total": self._find_amount(lines, "Grand Total"),
-            "Amount in Words": self._label_value(raw_text, ["Amount in Words"]),
-
-            # -------- Bank --------
-            "Bank Name": self._label_value(raw_text, ["Bank"]),
-            "Account Name": self._label_value(raw_text, ["Account Name"]),
-            "Account Number": self._first_match(ACCOUNT_REGEX, raw_text),
-            "IFSC Code": self._first_match(IFSC_REGEX, raw_text),
-            "Branch": self._label_value(raw_text, ["Branch"]),
-
-            # -------- Raw Backup --------
-            "Raw OCR Text": raw_text
-        }
-
-    # ================= EXTRACTION =================
-    def _extract_text(self, path):
+    def _run_ocr(self, pdf_path):
         text = ""
-        method = "TEXT"
+        images = convert_from_path(pdf_path, dpi=300, poppler_path=POPPLER_PATH)
+        for img in images:
+            img = np.array(img)
+            gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+            gray = cv2.resize(gray, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC)
+            page_text = pytesseract.image_to_string(gray, config=OCR_CONFIG)
+            text += page_text + "\n"
+        return text
 
-        with pdfplumber.open(path) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+    def _parse_text(self, raw_text):
+        lines = [l.strip() for l in raw_text.split("\n") if l.strip()]
+        if "Suyog Engineers" in raw_text:
+            return self._parse_invoice_4(lines)
+        elif "Intellivise" in raw_text or "BALANCE DUE" in raw_text:
+            return self._parse_invoice_3(lines)
+        else:
+            return self._parse_invoice_2(lines, raw_text)
 
-        if len(text.strip()) < 50:
-            method = "OCR"
-            images = convert_from_path(path, dpi=300, poppler_path=POPPLER_PATH)
-            for img in images:
-                text += self._ocr(img) + "\n"
-
-        return self._normalize(text), method
-
-    def _ocr(self, img):
-        img = np.array(img)
-        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-        gray = cv2.adaptiveThreshold(
-            gray, 255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY, 31, 2
-        )
-        return pytesseract.image_to_string(gray, config=OCR_CONFIG)
-
-    def _normalize(self, text):
-        return (
-            text.replace("₹", "INR ")
-                .replace("Rs.", "INR ")
-                .replace("Rs", "INR ")
-                .replace("â‚¹", "INR ")
-        )
-
-    # ================= ITEMS =================
-    def _extract_items(self, lines):
-        sr, desc, hsn, qty, rate, amt = [], [], [], [], [], []
+    def _parse_invoice_2(self, lines, raw_text):
+        data = {}
+        data["Vendor Name"] = "SUJIT ENGINEERING"
 
         for l in lines:
-            if re.search(r"\d+\s+.*\d{2}\.\d{2}$", l):
-                numbers = re.findall(AMOUNT_REGEX, l)
-                if numbers:
-                    amt.append(numbers[-1].replace(",", ""))
-                    rate.append(numbers[-1].replace(",", ""))
-                desc.append(l)
-                sr.append(str(len(sr) + 1))
-                qty.append("1")
-                hsn.append("")
+            if "GSTIN No." in l:
+                m = re.search(GST_REGEX, l)
+                if m:
+                    data["Vendor GSTIN"] = m.group()
+                break
 
-        return {
-            "Item Sr Nos": "|".join(sr),
-            "Item Descriptions": "|".join(desc),
-            "HSN/SAC Codes": "|".join(hsn),
-            "Quantities": "|".join(qty),
-            "Rates": "|".join(rate),
-            "Item Amounts": "|".join(amt)
+        for i, l in enumerate(lines):
+            if l.startswith("Party Details"):
+                data["Invoice No"] = l.split("Invoice No. :")[-1].strip()
+                if i + 1 < len(lines):
+                    buyer_line = lines[i + 1]
+                    data["Buyer Name"] = buyer_line.split("Dated")[0].strip()
+                    if "Dated :" in buyer_line:
+                        data["Invoice Date"] = buyer_line.split("Dated :")[-1].strip()
+                if i + 4 < len(lines):
+                    data["Buyer Address"] = " ".join(lines[i + 2:i + 5])
+                break
+
+        for l in lines:
+            if "GSTIN NO :" in l:
+                m = re.search(GST_REGEX, l)
+                if m:
+                    data["Buyer GSTIN"] = m.group()
+            if "PO No :" in l:
+                data["PO No"] = l.split("PO No :")[-1].strip()
+
+        for l in lines:
+            if "Place Supply" in l:
+                data["Place of Supply"] = l.split(":")[-1].strip()
+                break
+
+        for l in lines:
+            if "7308" in l and "KGS" in l:
+                nums = re.findall(AMOUNT_REGEX, l)
+                parts = re.findall(r"\b\d+\b|KGS", l)
+                if len(parts) >= 3 and len(nums) >= 2:
+                    data["HSN"] = parts[0]
+                    data["Quantity"] = parts[1]
+                    data["Unit"] = "KGS"
+                    data["Rate"] = nums[0]
+                    data["Item Amount"] = nums[1]
+                break
+
+        desc = []
+        capture = False
+        for l in lines:
+            if "DRG NO" in l:
+                capture = True
+            if capture:
+                if "Rs. In words" in l:
+                    break
+                desc.append(l)
+        if desc:
+            data["Item Description"] = " ".join(desc)
+
+        cgst = sgst = None
+        for l in lines:
+            if "CGST" in l:
+                m = re.search(AMOUNT_REGEX, l)
+                if m:
+                    cgst = float(m.group())
+                    data["CGST Amount"] = f"{cgst:.2f}"
+            elif l.startswith("it"):
+                m = re.search(AMOUNT_REGEX, l)
+                if m:
+                    sgst = float(m.group())
+                    data["SGST Amount"] = f"{sgst:.2f}"
+
+        if "Item Amount" in data and cgst is not None and sgst is not None:
+            amt = float(data["Item Amount"])
+            data["Taxable Amount"] = f"{amt:.2f}"
+            data["Grand Total"] = f"{amt + cgst + sgst:.2f}"
+
+        for l in lines:
+            if "Bank Name" in l:
+                data["Bank Name"] = l.split(":")[-1].strip()
+            elif "Branch :" in l:
+                data["Branch"] = l.split(":")[-1].strip()
+            elif "IFSC Code" in l:
+                m = re.search(IFSC_REGEX, l)
+                if m:
+                    data["IFSC Code"] = m.group()
+            elif "A/CNo" in l:
+                m = re.search(ACCOUNT_REGEX, l)
+                if m:
+                    data["Account No"] = m.group()
+
+        return data
+
+    def _parse_invoice_3(self, lines):
+        data = {
+            "Vendor Name": "Intellivise Engineering Services Pvt Ltd",
+            "Buyer Name": "Wilo Mather and Platt Pumps Pvt. Ltd."
         }
 
-    # ================= HELPERS =================
-    def _find_amount(self, lines, keyword):
-        for l in lines:
-            if keyword.lower() in l.lower():
-                m = re.findall(AMOUNT_REGEX, l)
-                if m:
-                    return m[-1].replace(",", "")
-        return ""
-
-    def _find_percent(self, lines, keyword):
-        for l in lines:
-            if keyword.lower() in l.lower() and "%" in l:
-                m = re.search(r"(\d+)%", l)
-                if m:
-                    return m.group(1)
-        return ""
-
-    def _label_value(self, text, labels):
-        for label in labels:
-            m = re.search(rf"{label}\s*[:\-]?\s*(.+)", text, re.I)
-            if m:
-                return m.group(1).split("\n")[0].strip()
-        return ""
-
-    def _first_match(self, regex, text):
-        m = re.search(regex, text)
-        return m.group() if m else ""
-
-    def _find_contains(self, lines, keys):
-        for l in lines:
-            for k in keys:
-                if k in l.upper():
-                    return k
-        return ""
-
-    def _vendor_name(self, lines):
-        for l in lines:
-            if any(x in l.upper() for x in ["PVT", "LTD", "PRIVATE"]):
-                return l
-        return ""
-
-    def _vendor_address(self, lines):
-        return " ".join(lines[1:6])
-
-    def _buyer_name(self, lines):
         for i, l in enumerate(lines):
-            if any(x in l.lower() for x in ["invoice to", "bill to"]):
-                return lines[i + 1]
-        return ""
+            if "27AAHCI" in l:
+                m = re.search(GST_REGEX, l)
+                if m:
+                    data["Vendor GSTIN"] = m.group()
 
-    def _buyer_address(self, lines):
-        for i, l in enumerate(lines):
-            if any(x in l.lower() for x in ["invoice to", "bill to"]):
-                return " ".join(lines[i + 2:i + 6])
-        return ""
+            if "27AABCD" in l and not data.get("Buyer GSTIN"):
+                m = re.search(GST_REGEX, l)
+                if m:
+                    data["Buyer GSTIN"] = m.group()
 
-    def _buyer_gstin(self, lines):
+            if "INVOICE NO" in l:
+                parts = l.split("#")
+                if len(parts) > 1:
+                    data["Invoice No"] = parts[-1].strip()
+
+            if "INVOICE DATE" in l and i + 1 < len(lines):
+                m = re.search(r"\d{2}/\d{2}/\d{4}", lines[i + 1])
+                if m:
+                    data["Invoice Date"] = m.group()
+
+            if "PO No" in l:
+                data["PO No"] = l.split(":")[-1].strip()
+
+            if "BALANCE DUE" in l:
+                m = re.search(AMOUNT_REGEX_COMMA, l)
+                if m:
+                    raw_amt = m.group().replace(",", "")
+                    data["Grand Total"] = "{:,.2f}".format(float(raw_amt))
+
+        items = []
         for l in lines:
-            if re.search(GST_REGEX, l):
-                return l
-        return ""
+            if re.search(r"\b\d{8}\b", l) and re.search(AMOUNT_REGEX_COMMA, l):
+                item = {}
+                hsn_m = re.search(r"(\b\d{8}\b)", l)
+                if hsn_m:
+                    item["HSN/SAC"] = hsn_m.group(1)
+                    parts = l.split(item["HSN/SAC"])
+                    if len(parts) > 1:
+                        raw_desc = re.sub(r"^[\d\s|]+", "", parts[0]).strip()
+                        item["Item Description"] = raw_desc
+                        clean_right = re.sub(r"[€£¥ZzOo|)]", " ", parts[1])
+                        nums = re.findall(r"[\d,]+\.?\d*", clean_right)
+                        valid_nums = []
+                        for n in nums:
+                            try:
+                                val = float(n.replace(",", ""))
+                                if val > 0:
+                                    valid_nums.append(val)
+                            except:
+                                pass
+                        if len(valid_nums) >= 2:
+                            item["Quantity"] = str(valid_nums[0])
+                            item["Taxable Value"] = "{:,.2f}".format(valid_nums[1])
+                        items.append(item)
 
+        if items:
+            data.update(items[0])
 
-# ================= EXCEL EXPORT =================
+        return {k: v for k, v in data.items() if v and str(v).strip()}
+
+    def _parse_invoice_4(self, lines):
+        data = {
+            "Vendor Name": "Suyog Engineers",
+            "Buyer Name": "Wilo Mather & Platt Pumps Pvt.Ltd."
+        }
+
+        addr_lines = []
+        capture_addr = False
+
+        for i, l in enumerate(lines):
+            if "Suyog Engineers" in l and "Bank" not in l:
+                capture_addr = True
+                continue
+            if capture_addr:
+                if "GSTIN" in l or "Reference" in l or len(addr_lines) > 3:
+                    capture_addr = False
+                else:
+                    if any(x in l for x in ["Block", "MIDC", "Pune", "Maharashtra", "India"]):
+                        addr_lines.append(re.split(r"\(A\d+", l)[0].strip(" |,"))
+
+            if "AAUFS" in l:
+                m = re.search(GST_REGEX, l)
+                if m:
+                    data["Vendor GSTIN"] = m.group()
+
+            if "AABCD" in l:
+                m = re.search(GST_REGEX, l)
+                if m:
+                    data["Buyer GSTIN"] = m.group()
+
+            if "Invoice No" in l or "dt." in l:
+                m = re.search(r"(?:A|No\.\s*)?(\d{3,4})\b", l)
+                if m:
+                    candidate = m.group(1)
+                    if 100 < int(candidate) < 10000 and candidate != "2025":
+                        data["Invoice No"] = candidate
+
+            if "Ack Date" in l or "Dated" in l or "Jan" in l:
+                m = re.search(DATE_REGEX, l)
+                if m and not data.get("Invoice Date"):
+                    data["Invoice Date"] = m.group()
+
+            if "W.O.NO." in l:
+                m = re.search(r"\d{8,10}", l)
+                if m:
+                    data["PO No"] = m.group()
+
+            if "Motor Vehicle No" in l and i + 1 < len(lines):
+                m = re.search(r"([A-Z0-9]{4,12})$", lines[i + 1])
+                if m:
+                    data["Vehicle No"] = m.group(1)
+
+        if addr_lines:
+            data["Vendor Address"] = ", ".join(addr_lines)
+
+        for l in lines:
+            if l.startswith("1 ") and "7308" in l:
+                parts = re.split(r"\s+7308", l)
+                if len(parts) > 1:
+                    data["Item Description"] = parts[0].replace("1 ", "", 1).strip().replace("MOTOR'STOOL", "MOTOR STOOL")
+                    data["HSN"] = "7308" + parts[1][:5]
+                    qty_match = re.search(r"(\d+[:.]\d+)\s*NOS", parts[1])
+                    if qty_match:
+                        data["Quantity"] = qty_match.group(1).replace(":", ".")
+                        data["Unit"] = "NOS"
+                    amounts = re.findall(AMOUNT_REGEX_COMMA, parts[1])
+                    if len(amounts) >= 2:
+                        data["Rate"] = amounts[0]
+                        data["Taxable Amount"] = amounts[-1]
+
+            if "CGST" in l:
+                m = re.search(AMOUNT_REGEX_COMMA, l)
+                if m:
+                    data["CGST Amount"] = m.group()
+
+            if "SGST" in l:
+                m = re.search(AMOUNT_REGEX_COMMA, l)
+                if m:
+                    data["SGST Amount"] = m.group()
+
+            amounts = re.findall(AMOUNT_REGEX_COMMA, l)
+            if len(amounts) >= 3 and not data.get("SGST Amount"):
+                if abs(float(amounts[1].replace(",", "")) - float(amounts[2].replace(",", ""))) < 5:
+                    data["SGST Amount"] = amounts[2]
+
+            if "Total" in l and "Amount" in l:
+                m = re.search(AMOUNT_REGEX_COMMA, l)
+                if m:
+                    data["Grand Total"] = m.group()
+
+        try:
+            taxable = float(data.get("Taxable Amount", "0").replace(",", ""))
+            cgst = float(data.get("CGST Amount", "0").replace(",", ""))
+            sgst = float(data.get("SGST Amount", "0").replace(",", ""))
+            if not data.get("Grand Total") and taxable > 0:
+                data["Grand Total"] = "{:,.2f}".format(taxable + cgst + sgst)
+        except:
+            pass
+
+        return {k: v for k, v in data.items() if v and str(v).strip()}
+
 def export_to_excel(rows, output_path):
-    """
-    rows: list of dicts returned by InvoicePipeline.process_invoice()
-    """
-
     if not rows:
-        raise ValueError("No data to export")
-
-    df = pd.DataFrame(rows)
-
-    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Invoices")
-
-        ws = writer.sheets["Invoices"]
-
-        for i, col in enumerate(df.columns, 1):
-            max_len = max(
-                df[col].astype(str).map(len).max(),
-                len(col)
-            )
-            col_letter = chr(64 + i) if i <= 26 else None
-            if col_letter:
-                ws.column_dimensions[col_letter].width = min(max_len + 2, 60)
+        raise RuntimeError("No data to export")
+    base, ext = os.path.splitext(output_path)
+    final = output_path
+    i = 1
+    while os.path.exists(final):
+        final = f"{base}_{i}{ext}"
+        i += 1
+    pd.DataFrame(rows).to_excel(final, index=False)
+    return final
