@@ -1,0 +1,71 @@
+{
+  "supplier": {
+    "name": "SANGAM ENGINEERS",
+    "gstin": "27AABCD3568L1ZC",
+    "contact": ""
+  },
+  "buyer": {
+    "name": ":No- I-9,1-10,C-1Ground Floor_ rty Details 0 MATHER AND PLATT PUMPS PVT LTD Place of Supply Dated Invoice No. 294/2025-26 09/01/2026 Maharashtra (27)",
+    "gstin": "27AABCD3568L1ZC",
+    "address": ""
+  },
+  "invoice_meta": {
+    "invoice_no": "294/2025-26",
+    "invoice_date": "09/01/2026",
+    "po_no": "Date",
+    "place_of_supply": ":No- I-9,1-10,C-1Ground Floor_ rty Details 0 MATHER AND PLATT PUMPS PVT LTD Place of Supply Dated Invoice No. 294/2025-26 09/01/2026 Maharashtra (27)"
+  },
+  "line_items": [],
+  "taxes": {
+    "cgst": "Add Add Add CGST . SGST Rounded Off 1 9.00 9.00 % % 9,416.43 9,416.43 0.14",
+    "sgst": "Add Add Add CGST . SGST Rounded Off 1 9.00 9.00 % % 9,416.43 9,416.43 0.14",
+    "igst": ""
+  },
+  "totals": {
+    "taxable_value": "",
+    "total_tax": "08",
+    "grand_total": "9.00",
+    "amount_in_words": "upees One Lakh Twenty Three Thousand Four Hundred Sixty Only"
+  },
+  "bank_details": {
+    "bank_name": "",
+    "account_no": "8237001575",
+    "ifsc": ""
+  },
+  "declarations": [
+    "Original for Receipent",
+    "TAX INVOICE",
+    "Gat No. 1414, Navchaitanya Housing, Society; Morewasti Chikhal; Pune-411062",
+    "Works- Gat No.70, Jyotibanagar, Sonawane,_Wasti, Talawade; Pune 411062",
+    "GSTIN 27ADJFS9740D1zS",
+    "DRG. NO-2 5651 1150 0507",
+    "ITEM NO-8213146 SR-50",
+    "WET-112 KG MJC RATE-2040/- REDUCER-1700",
+    "DRG NO 2 5409 1151 009",
+    "ITEM CODE-8121860 SR-60",
+    "WET-11o KG MJC RATE-204O/-",
+    "DRG NO 2 5410 1152 013",
+    "ITEM CODE- 8122013 SR-70",
+    "WET-56 KG MJC RATE-1610/-",
+    "ORDER-81354649/10",
+    "1,04,627.00",
+    "'rms & Conditions Receiver's Signature",
+    "& O.E:",
+    "Goods once sold will not be taken back for SANGAM ENGINEERS",
+    "Subject to 'Pune' Jurisdiction only Gthorised Sighatory",
+    "(0 2",
+    "4 Talawade;",
+    "Tel; 8237001575 email sangamengineersao@gmail.com",
+    "irdia Industrial Park,opposite Reverse Charge N",
+    "1e-Banglore Highway Dhangarwadi indala,Satara 412802 TIn allan No UIN 27AABCD3568L1ZC Vehicle No. PO No Date Date 9910418567 31/12/2025",
+    "1 Description of Goods HSN/SAC Code Qty in Nos Qty. Unit Price Amount(?)",
+    "1 RM BOTTOM PIPE FINISH 7308 02 PC 2.00 Pcs. 14,324.00 28,648.00",
+    "2\" R M INT PIPE FINISH ORDER-81354649/10 7308 05 PC 5.00 Pcs. 12,435.00 62,175.00",
+    "3 AR M TOP PIPE FINISH ORDER-81354649/10 7308 02 PC 2.00 Pcs. 6,902.00 13,804.00",
+    "Grand Total 9.00 Pcs. 1,23,460.00",
+    "iN Code Tax Rate Taxable Amt: CGST SGST Total Tax",
+    "08 18% 1,04,627.00 9,416.43 9,416.43 18,832.86",
+    "Interest 18%/ p.a. will be charged if the payment 0@",
+    "not made with in the stipulated time_ 8"
+  ]
+}

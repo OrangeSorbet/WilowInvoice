@@ -13,6 +13,12 @@ pytesseract==0.3.13       # Latest Tesseract wrapper
 opencv-python-headless==4.10.0.84 # Updated computer vision core
 Pillow==11.0.0            # Updated imaging library
 pdf2image
+paddleocr>=2.6
+paddlepaddle 
+opencv-python
+numpy
+shapely
+rapidfuzz
 
 # --- Intelligence & NLP ---
 spacy==3.8.2              # NLP Engine
